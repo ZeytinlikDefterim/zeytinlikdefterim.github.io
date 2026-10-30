@@ -1,5 +1,5 @@
 /* Zeytinlik Defterim © 2026 Fatih Aybars TAHTALI. Tüm hakları saklıdır. */
-const V = 'zd-20261029194727';
+const V = 'zd-20261030091436';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
