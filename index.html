@@ -91,6 +91,14 @@ a{color:inherit}
 .mark{width:36px;height:36px;flex:none}
 .farm{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:-.01em;line-height:1.1;overflow-wrap:anywhere}
 .place{font-size:12.5px;color:var(--band-ink-2);overflow-wrap:anywhere}
+.wm{display:inline-flex;flex-direction:column;align-items:flex-end;max-width:100%}
+.taf{display:flex;align-items:center;gap:6px;align-self:stretch;margin:2px 0;line-height:1}
+.taf i{display:block;flex:1;min-width:18px;height:1.5px;border-radius:1px;background:var(--oil)}
+.taf span{font-family:var(--f-display);font-size:9.5px;font-weight:700;letter-spacing:.2em;margin-right:-.2em;color:var(--band-ink-2)}
+.pastbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--oil-soft);font-size:14.5px;line-height:1.4}
+.pastbar .pb-a{display:flex;flex-wrap:wrap;gap:8px}
+.past-n{margin:0 0 12px;padding:9px 12px;border-radius:10px;background:var(--oil-soft);color:var(--ink);font-size:14px}
+td.chg{color:var(--ink-2)}
 .band-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .sync{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--band-ink-2)}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--band-ink-2)}
@@ -361,7 +369,7 @@ fieldset.fs{border:0;margin:0;padding:0;min-width:0}
 .field[hidden]{display:none!important}
 .field>label:not(.check),.lbl{font-size:13px;font-weight:700;color:var(--ink-2)}
 .req{color:var(--bad);margin-left:2px}
-.field input[type=text],.field input[type=date],.field input[type=search],.field input[type=email],.field input[type=password],.field select,.field textarea{width:100%;min-height:46px;padding:9px 11px;border:1px solid var(--line-2);border-radius:9px;background:var(--field);font-size:16px}
+.field input[type=text],.field input[type=date],.field input[type=search],.field input[type=email],.field input[type=password],.field input[type=tel],.field select,.field textarea{width:100%;min-height:46px;padding:9px 11px;border:1px solid var(--line-2);border-radius:9px;background:var(--field);font-size:16px}
 .field textarea{min-height:66px;resize:vertical}
 .inp-u{display:flex;align-items:stretch;border:1px solid var(--line-2);border-radius:9px;background:var(--field);overflow:hidden;min-width:0}
 .field .inp-u input[type=text]{border:0;border-radius:0;flex:1;min-width:0}
@@ -544,7 +552,7 @@ details.mx summary{cursor:pointer;padding:10px 2px;font-weight:700;color:var(--o
         <ellipse cx="142" cy="152" rx="16" ry="20" transform="rotate(-35 142 152)" style="fill:var(--oil)"/>
       </svg>
       <div>
-        <div class="farm">zeytinlik defterim</div>
+        <div class="wm"><div class="farm">zeytinlik defterim</div><div class="taf"><i aria-hidden="true"></i><span>TAF</span></div></div>
         <div class="place" id="farmPlace">Hasat, bakım ve masraf defteri</div>
       </div>
     </div>
@@ -564,6 +572,7 @@ details.mx summary{cursor:pointer;padding:10px 2px;font-weight:700;color:var(--o
     <a href="#yag" data-view="yag">Yağ ve satış</a>
     <a href="#depo" data-view="depo">Depo</a>
     <a href="#takvim" data-view="takvim">Takvim</a>
+    <a href="#karsilastir" data-view="karsilastir">Karşılaştırma</a>
     <a href="#ayarlar" data-view="ayarlar">Ayarlar</a>
   </div>
 </nav>
@@ -598,6 +607,7 @@ const CONSENT_TXT = 'Kayıtlarım Zeytinlik Defterim sunucusunda (Google Firebas
 const footHTML = () => '<footer class="appfoot"><span>' + APP_NAME + ' © ' + CYEAR + ' ' + OWNER + ' · Tüm hakları saklıdır.</span><span>İzinsiz kopyalanamaz, çoğaltılamaz, satılamaz.</span></footer>';
 const LS_KEY = 'zeytinlik-defterim:v1';
 const LS_NOTE = 'zeytinlik-defterim:cihaz-notu';
+const LS_AUTHM = 'zeytinlik-defterim:giris-yolu';
 /* Safari (iPhone'daki bütün tarayıcılar dahil) başka sitenin içinde açılan sayfanın kayıtlarını tarayıcı kapanınca siler. */
 const FRAMED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 const APPLE_WK = (() => { const u = navigator.userAgent || ''; return /iP(hone|ad|od)/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1) || (/Safari\//.test(u) && !/Chrome|Chromium|CriOS|FxiOS|EdgiOS|Edg\/|OPR|Android/.test(u)); })();
@@ -720,7 +730,7 @@ const S = {
   parcels: [], records: [], stock: [], workers: [], labor: [], pay: [], tasks: [],
   loaded: {}, view: 'pano', season: null, seasonPicked: false, varSel: 'all',
   f: {g: 'all', p: 'all', q: ''}, sheet: null,
-  fb: null, auth: FBCFG ? 'loading' : 'none', authTab: 'in', authErr: '', user: null, profile: null, pendingConsent: null,
+  fb: null, auth: FBCFG ? 'loading' : 'none', authTab: 'in', authM: 'phone', ph: null, phLast: '', authErr: '', user: null, profile: null, pendingConsent: null,
   isAdmin: false, users: [], usersLoaded: false, usersErr: '', guest: null,
 };
 let D = null, PMAP = {}, WMAP = {};
@@ -728,6 +738,7 @@ const tinKg = () => (+S.settings.tinKg > 0 ? +S.settings.tinKg : 16);
 const loading = () => S.store === 'connecting' || (S.store === 'account' && !S.loaded.records);
 const colLoading = c => S.store === 'connecting' || (S.store === 'account' && !S.loaded[c]);
 try { S.noteHidden = localStorage.getItem(LS_NOTE) === '1'; } catch (e) {}
+try { const m = localStorage.getItem(LS_AUTHM); if (m === 'email' || m === 'phone') S.authM = m; } catch (e) {}
 
 /* ---------- sezon ---------- */
 const startMonth = () => { const m = Math.round(+S.settings.seasonStart); return m >= 1 && m <= 12 ? m : 9; };
@@ -743,8 +754,21 @@ function seasonMonths(id){
   for (let i = 0; i < 12; i++) { const d = new Date(y, sm - 1 + i, 1); out.push({y: d.getFullYear(), m: d.getMonth() + 1, cost: 0, inc: 0}); }
   return out;
 }
+/* Sezonu yıl kadar kaydırır: shiftSeason('2026/27', -1) → '2025/26' */
+function shiftSeason(id, n){ const y = parseInt(id, 10); if (!y) return null; const st = y + n; return startMonth() === 1 ? String(st) : st + '/' + pad((st + 1) % 100); }
+/* Yeni kaydın tarihi: geçmiş bir sezon seçiliyse o sezondaki aynı gün */
+function defDate(){
+  const t = todayStr(), cur = seasonOf(t), s = S.season;
+  if (!s || s === cur) return t;
+  const dy = parseInt(cur, 10) - parseInt(s, 10);
+  if (!(dy > 0)) return t;
+  let d = (+t.slice(0, 4) - dy) + t.slice(4);
+  if (d.slice(5) === '02-29') d = d.slice(0, 8) + '28';
+  return seasonOf(d) === s ? d : t;
+}
 function seasonsList(){
-  const set = new Set([seasonOf(todayStr()), S.season]);
+  const now = seasonOf(todayStr());
+  const set = new Set([now, shiftSeason(now, -1), S.season]);
   [S.records, S.labor, S.pay].forEach(a => a.forEach(x => { const s = seasonOf(x.date); if (s) set.add(s); }));
   return Array.from(set).filter(Boolean).sort().reverse();
 }
@@ -1299,7 +1323,8 @@ function onFbUser(u){
   stopListeners(); if (G) exitGuest(true);
   resetData(); S.profile = null; S.isAdmin = false; S.users = []; S.usersLoaded = false; S.usersErr = '';
   if (!u) { S.user = null; S.store = 'connecting'; S.auth = 'signedOut'; schedule(); return; }
-  S.user = {uid: u.uid, email: u.email || '', name: u.displayName || ''};
+  S.ph = null; dropRecap();
+  S.user = {uid: u.uid, email: u.email || '', phone: u.phoneNumber || '', name: u.displayName || ''};
   S.auth = 'loading'; S.store = 'connecting'; S.authErr = ''; schedule();
   const F = S.fb.F, fs = S.fb.fs;
   unsubs.push(F.onSnapshot(F.doc(fs, 'profiles', u.uid), s => {
@@ -1351,7 +1376,7 @@ async function saveConsent(name){
   const nm = String(name || u.name || '').trim().slice(0, 80);
   S.auth = 'loading'; S.authErr = ''; schedule();
   try {
-    const p = F.setDoc(profRef(), {name: nm, email: u.email || '', consentAt: now, consentV: CONSENT_V, consentText: CONSENT_TXT, createdAt: (S.profile && S.profile.createdAt) || now, lastSeen: now}, {merge: true});
+    const p = F.setDoc(profRef(), {name: nm, email: u.email || '', phone: u.phone || '', consentAt: now, consentV: CONSENT_V, consentText: CONSENT_TXT, createdAt: (S.profile && S.profile.createdAt) || now, lastSeen: now}, {merge: true});
     const cu = S.fb.auth.currentUser;
     if (nm && cu && !cu.displayName) S.fb.A.updateProfile(cu, {displayName: nm}).catch(() => {});
     S.user.name = S.user.name || nm;
@@ -1417,13 +1442,23 @@ function fbMsg(e){
     'auth/web-storage-unsupported': 'Bu tarayıcıda giriş yapılamıyor (gizli sekme olabilir). Normal bir sekmede aç.',
     'auth/unauthorized-domain': 'Bu adres Firebase’de izinli değil (Authentication → Settings → Authorized domains).',
     'auth/operation-not-allowed': 'Bu giriş yöntemi Firebase’de açılmamış (Authentication → Sign-in method).',
+    'auth/invalid-phone-number': 'Numara eksik ya da yanlış. 0532 123 45 67 gibi yaz.',
+    'auth/missing-phone-number': 'Cep telefonu numaranı yaz.',
+    'auth/quota-exceeded': 'Bugünlük SMS sınırı doldu. Daha sonra tekrar dene ya da Google veya e-postayla gir.',
+    'auth/invalid-verification-code': 'Kod yanlış. SMS’teki 6 haneli kodu kontrol et.',
+    'auth/missing-verification-code': 'SMS ile gelen 6 haneli kodu yaz.',
+    'auth/code-expired': 'Kodun süresi doldu. “Kodu tekrar gönder”e dokun.',
+    'auth/session-expired': 'Kodun süresi doldu. “Kodu tekrar gönder”e dokun.',
+    'auth/captcha-check-failed': 'Güvenlik doğrulaması geçilemedi. Sayfayı yenileyip tekrar dene.',
+    'auth/invalid-app-credential': 'Güvenlik doğrulaması geçilemedi. Sayfayı yenileyip tekrar dene.',
+    'auth/billing-not-enabled': 'Telefonla giriş henüz açılmadı (Firebase’de Blaze planı gerekiyor). Şimdilik Google ya da e-postayla gir.',
     'permission-denied': 'Sunucu izin vermedi. Firestore kurallarını kontrol et.',
     'unavailable': 'Sunucuya ulaşılamadı. İnternetini kontrol et.',
   };
   return m[c] || ('Bir sorun çıktı' + (c ? ' (' + c + ')' : '') + '. Tekrar dene.');
 }
 function authErr(msg){ S.authErr = msg || ''; const el = $('#authErr'); if (el) { el.textContent = S.authErr; el.hidden = !S.authErr; } }
-function authBusy(b){ $$('#authForm button, #consentForm button, [data-act="gSign"]').forEach(x => { x.disabled = b; }); }
+function authBusy(b){ $$('#authForm button, #consentForm button, #phoneForm button, #codeForm button, [data-act="gSign"], [data-act="authM"]').forEach(x => { x.disabled = b; }); }
 async function doGoogle(){
   const A = S.fb.A; authErr(''); authBusy(true);
   try { await A.signInWithPopup(S.fb.auth, new A.GoogleAuthProvider()); }
@@ -1448,7 +1483,54 @@ async function doReset(){
   try { await S.fb.A.sendPasswordResetEmail(S.fb.auth, email); authErr(''); toast('Şifre yenileme e-postası gönderildi'); }
   catch (e) { authErr(fbMsg(e)); }
 }
-function doSignOut(){ if (!S.fb) return; if (G) exitGuest(true); S.fb.A.signOut(S.fb.auth).catch(() => toast('Çıkış yapılamadı')); location.hash = 'pano'; }
+/* Telefonla giriş: numaraya SMS ile 6 haneli kod gider, kod yazılınca giriş yapılır. Yeni numarada önce onay ekranı çıkar. */
+function normPhone(raw){
+  const s = String(raw || '').trim();
+  let d = s.replace(/\D/g, '');
+  if (s.charAt(0) === '+' && d.indexOf('90') !== 0) return d.length >= 8 && d.length <= 15 ? '+' + d : null;
+  if (d.indexOf('0090') === 0) d = d.slice(4);
+  else if (d.length === 12 && d.indexOf('90') === 0) d = d.slice(2);
+  else if (d.length === 11 && d.charAt(0) === '0') d = d.slice(1);
+  return /^5\d{9}$/.test(d) ? '+90' + d : null;
+}
+function fmtPhone(p){ const m = /^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(p || ''); return m ? '0' + m[1] + ' ' + m[2] + ' ' + m[3] + ' ' + m[4] : (p || ''); }
+let recapV = null;
+function dropRecap(){ try { if (recapV) recapV.clear(); } catch (e) {} recapV = null; const el = document.getElementById('zdRecap'); if (el) el.remove(); }
+function recapBox(){ const el = document.createElement('div'); el.id = 'zdRecap'; document.body.appendChild(el); return el; }
+async function doPhoneSend(again){
+  const A = S.fb.A, inp = $('#a-phone'), raw = inp ? inp.value : '';
+  const p = again || normPhone(raw);
+  if (!p) { if (inp) inp.focus(); return authErr(raw.trim() ? 'Numara eksik ya da yanlış. 0532 123 45 67 gibi yaz.' : 'Cep telefonu numaranı yaz.'); }
+  if (!again) S.phLast = raw.trim();
+  authErr(''); authBusy(true);
+  try {
+    dropRecap();
+    recapV = new A.RecaptchaVerifier(S.fb.auth, recapBox(), {size: 'invisible'});
+    const conf = await A.signInWithPhoneNumber(S.fb.auth, p, recapV);
+    S.ph = {num: p, conf: conf, at: Date.now()}; S.authErr = '';
+    render();
+    const c = $('#a-code'); if (c) c.focus();
+    if (again) toast('Yeni kod gönderildi');
+  } catch (e) {
+    dropRecap(); authBusy(false);
+    authErr(e && e.code === 'auth/operation-not-allowed' ? 'Telefonla giriş Firebase’de açılmamış ya da Türkiye’ye SMS izni verilmemiş (Authentication → Settings → SMS region policy).' : fbMsg(e));
+  }
+}
+async function doPhoneCode(form){
+  const el = form.elements.code, code = String(el.value || '').replace(/\D/g, '');
+  if (code.length !== 6) { el.focus(); return authErr('SMS ile gelen 6 haneli kodu yaz.'); }
+  if (!S.ph) return;
+  authErr(''); authBusy(true);
+  try { await S.ph.conf.confirm(code); }
+  catch (e) { authBusy(false); authErr(fbMsg(e)); }
+}
+function phResend(){
+  if (!S.ph) return;
+  if (Date.now() - S.ph.at < 45000) return authErr('Kod genelde birkaç saniyede gelir. Gelmezse 1 dakika sonra tekrar iste.');
+  doPhoneSend(S.ph.num);
+}
+function phBack(){ S.ph = null; dropRecap(); S.authErr = ''; render(); const i = $('#a-phone'); if (i) i.focus(); }
+function doSignOut(){ if (!S.fb) return; if (G) exitGuest(true); S.ph = null; dropRecap(); S.fb.A.signOut(S.fb.auth).catch(() => toast('Çıkış yapılamadı')); location.hash = 'pano'; }
 /* Yönetici: bir kullanıcının defterini salt okunur aç */
 async function openUser(uid){
   if (!S.fb || !S.isAdmin) return;
@@ -1460,7 +1542,7 @@ async function openUser(uid){
     const res = await Promise.all(COLS.map(c => F.getDocs(F.collection(fs, b + '/defter/' + c))).concat([F.getDoc(F.doc(fs, b + '/settings'))]));
     const data = {settings: res[COLS.length].exists() ? res[COLS.length].data() : {}};
     COLS.forEach((c, i) => { data[c] = res[i].docs.map(d => Object.assign({}, d.data(), {id: d.id})); });
-    enterGuest({uid: uid, name: p.name || p.email || 'İsimsiz kullanıcı', email: p.email || ''}, data);
+    enterGuest({uid: uid, name: p.name || p.email || fmtPhone(p.phone) || 'İsimsiz kullanıcı', email: p.email || fmtPhone(p.phone)}, data);
   } catch (e) { toast('Defter açılamadı: ' + fbMsg(e)); }
 }
 function enterGuest(info, data){
@@ -1782,7 +1864,8 @@ function heroHTML(){
   facts.push(D.dayCount ? D.dayCount + ' hasat günü' : 'Bu sezon henüz hasat girilmedi');
   if (D.lastHarvest) facts.push('son hasat ' + fmtDs(D.lastHarvest));
   if (D.serviceKg) facts.push('hizmette ' + num(D.serviceKg) + ' kg ayrı');
-  let h = '<section class="hero" aria-label="Bugüne kadar toplanan zeytin"><div class="hero-a"><div class="eyebrow">Bugüne kadar toplanan · ' + esc(S.season) + '</div>';
+  const isCur = S.season === seasonOf(todayStr());
+  let h = '<section class="hero" aria-label="Bugüne kadar toplanan zeytin"><div class="hero-a"><div class="eyebrow">' + (isCur ? 'Bugüne kadar toplanan' : 'Toplanan') + ' · ' + esc(S.season) + '</div>';
   h += '<div class="big">' + (L ? '…' : num(kg)) + '<small>kg</small></div>';
   h += '<div class="facts">' + (L ? '<span>&nbsp;</span>' : facts.map(f => '<span>' + esc(f) + '</span>').join('')) + '</div>';
   if (!L && D.estTotal) {
@@ -1791,7 +1874,8 @@ function heroHTML(){
   }
   if (!L && D.oliveKg) { const vs = varList(); if (vs.length) h += '<div class="vchips">' + vs.map(v => '<button type="button" class="vchip" data-act="goVar" data-v="' + esc(v) + '" title="' + esc(v) + ' elek dağılımı"><span>' + esc(v) + '</span><b>' + num(D.byVar[v].kg) + ' kg</b><i class="cv" aria-hidden="true">›</i></button>').join('') + '</div>'; }
   if (!L && D.valTot) h += '<div class="facts"><span>Tahmini ürün değeri <b class="mono">' + tl(D.valTot) + '</b></span></div>';
-  h += '<div class="today"><span>Bugün: <b>' + num(D.todayKg) + ' kg</b>' + (D.todayRecs ? ' · ' + D.todayRecs + ' bahçe' : '') + '</span><button type="button" class="btn btn-p btn-sm" data-act="new" data-form="rec:hasat">' + (D.dayCount ? 'Bugünün hasadını gir' : 'İlk hasadı gir') + '</button></div>';
+  h += isCur ? '<div class="today"><span>Bugün: <b>' + num(D.todayKg) + ' kg</b>' + (D.todayRecs ? ' · ' + D.todayRecs + ' bahçe' : '') + '</span><button type="button" class="btn btn-p btn-sm" data-act="new" data-form="rec:hasat">' + (D.dayCount ? 'Bugünün hasadını gir' : 'İlk hasadı gir') + '</button></div>'
+    : '<div class="today"><span>Geçmiş sezon: <b>' + esc(S.season) + '</b></span><button type="button" class="btn btn-p btn-sm" data-act="new" data-form="rec:hasat">Bu sezona hasat ekle</button></div>';
   h += '</div><div class="hero-b"><div class="eyebrow cap">Gün gün hasat' + (D.dayList.length ? ' · ' + esc(rangeMonths()) : '') + '</div>' + (L ? '<div class="none">…</div>' : D.dayList.length ? dayChart(heroW()) : '<div class="none">Hasat girdikçe her günün kilosu burada çubuk olarak görünür.</div>') + '</div></section>';
   return h;
 }
@@ -2117,17 +2201,30 @@ function authHTML(){
   if (a === 'error') return '<section class="panel auth"><h2>Sunucuya bağlanılamadı</h2><p>İnternet bağlantını kontrol edip sayfayı yenile. İlk açılışta internet gerekir; sonra çevrimdışı da çalışır.</p><button type="button" class="btn btn-p" data-act="reload">Yeniden dene</button></section>';
   if (a === 'consent') {
     const nm = (S.profile && S.profile.name) || (S.user && S.user.name) || '';
-    return '<section class="panel auth"><h2>Devam etmeden önce</h2><p>' + esc(S.user && S.user.email ? S.user.email + ' ile giriş yaptın.' : 'Giriş yaptın.') + '</p>' +
+    const who = S.user ? (S.user.email || fmtPhone(S.user.phone)) : '';
+    return '<section class="panel auth"><h2>Devam etmeden önce</h2><p>' + esc(who ? who + ' ile giriş yaptın.' : 'Giriş yaptın.') + '</p>' +
+      '<p class="fine">Daha önce başka bir yolla (e-posta, Google ya da telefon) kayıt olduysan burası yeni ve boş bir defter olur. Eski defterine dönmek için “Vazgeç, çıkış yap”a dokun ve eski yolla gir.</p>' +
       '<form id="consentForm" novalidate><div class="fgrid"><div class="field"><label for="a-name">Adın soyadın</label><input type="text" id="a-name" name="name" autocomplete="name" value="' + esc(nm) + '" maxlength="80"></div>' +
       '<label class="ok"><input type="checkbox" name="ok" id="a-ok"><span>' + esc(CONSENT_TXT) + '</span></label></div>' +
       '<div class="ferr" id="authErr" role="alert"' + (S.authErr ? '' : ' hidden') + '>' + esc(S.authErr) + '</div>' +
       '<div class="acts2"><button type="submit" class="btn btn-p">Kabul et ve devam et</button><button type="button" class="btn btn-q" data-act="signOut">Vazgeç, çıkış yap</button></div></form></section>';
   }
   if (a !== 'signedOut') return '<div class="loading">Bağlanıyor…</div>';
-  const up = S.authTab === 'up';
-  return '<section class="panel auth"><h2>' + (up ? 'Zeytinlik Defterim’e kayıt ol' : 'Zeytinlik Defterim’e giriş') + '</h2><p>Hasadın, bakımın ve masrafın hesabında saklanır; telefon değişse de kaybolmaz.</p>' +
+  const up = S.authTab === 'up', em = S.authM === 'email';
+  const errBox = '<div class="ferr" id="authErr" role="alert"' + (S.authErr ? '' : ' hidden') + '>' + esc(S.authErr) + '</div>';
+  let h = '<section class="panel auth"><h2>' + (em && up ? 'Zeytinlik Defterim’e kayıt ol' : 'Zeytinlik Defterim’e giriş') + '</h2><p>Hasadın, bakımın ve masrafın hesabında saklanır; telefon değişse de kaybolmaz.</p>' +
     '<button type="button" class="btn gbtn" data-act="gSign">' + G_ICON + 'Google ile devam et</button>' +
-    '<div class="or">ya da e-posta ile</div>' +
+    '<div class="or">ya da</div>' +
+    '<div class="seg" role="group" aria-label="Giriş yolu"><button type="button" data-act="authM" data-v="phone" aria-pressed="' + !em + '">Telefon numarası</button><button type="button" data-act="authM" data-v="email" aria-pressed="' + em + '">E-posta</button></div>';
+  if (!em) {
+    if (S.ph) h += '<form id="codeForm" novalidate><p><b>' + esc(fmtPhone(S.ph.num)) + '</b> numarasına SMS ile 6 haneli bir kod gönderildi.</p>' +
+      '<div class="fgrid"><div class="field"><label for="a-code">SMS’teki kod</label><input type="text" id="a-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false"></div></div>' + errBox +
+      '<div class="acts2"><button type="submit" class="btn btn-p">Giriş yap</button><button type="button" class="lnk" data-act="phResend">Kodu tekrar gönder</button><button type="button" class="lnk" data-act="phBack">Numarayı değiştir</button></div></form>';
+    else h += '<form id="phoneForm" novalidate><div class="fgrid"><div class="field"><label for="a-phone">Cep telefonu</label><input type="tel" id="a-phone" name="phone" autocomplete="tel" inputmode="tel" placeholder="0532 123 45 67" maxlength="20" value="' + esc(S.phLast) + '"></div></div>' + errBox +
+      '<div class="acts2"><button type="submit" class="btn btn-p">Kod gönder</button></div><p class="fine">Numarana SMS ile kod gelir, şifre gerekmez. Numara yeniyse hesabın açılır.</p></form>';
+    return h + '<p class="fine">Kayıtlarını uygulamanın sahibi ' + esc(OWNER) + ' görebilir; başka kullanıcılar göremez. Telefonla ya da Google ile ilk girişte bu onay ayrıca istenir.</p></section>';
+  }
+  return h +
     '<div class="seg" role="group" aria-label="Giriş ya da kayıt"><button type="button" data-act="authTab" data-v="in" aria-pressed="' + !up + '">Giriş yap</button><button type="button" data-act="authTab" data-v="up" aria-pressed="' + up + '">Kayıt ol</button></div>' +
     '<form id="authForm" novalidate><div class="fgrid">' +
     (up ? '<div class="field"><label for="a-name">Adın soyadın</label><input type="text" id="a-name" name="name" autocomplete="name" maxlength="80"></div>' : '') +
@@ -2136,7 +2233,7 @@ function authHTML(){
     (up ? '<label class="ok"><input type="checkbox" name="ok" id="a-ok"><span>' + esc(CONSENT_TXT) + '</span></label>' : '') +
     '</div><div class="ferr" id="authErr" role="alert"' + (S.authErr ? '' : ' hidden') + '>' + esc(S.authErr) + '</div>' +
     '<div class="acts2"><button type="submit" class="btn btn-p">' + (up ? 'Kayıt ol' : 'Giriş yap') + '</button>' + (up ? '' : '<button type="button" class="lnk" data-act="pwReset">Şifremi unuttum</button>') + '</div></form>' +
-    '<p class="fine">Kayıtlarını uygulamanın sahibi ' + esc(OWNER) + ' görebilir; başka kullanıcılar göremez. Google ile ilk girişte bu onayı ayrıca istenir.</p></section>';
+    '<p class="fine">Kayıtlarını uygulamanın sahibi ' + esc(OWNER) + ' görebilir; başka kullanıcılar göremez. Telefonla ya da Google ile ilk girişte bu onay ayrıca istenir.</p></section>';
 }
 
 /* ---------- Kullanıcılar (yönetici) ---------- */
@@ -2157,7 +2254,7 @@ function vUsers(){
   if (!S.usersLoaded) return h + (S.usersErr ? emptyBox('Liste alınamadı', 'Firestore kurallarını ve yönetici kaydını kontrol et (' + S.usersErr + ').', '') : loadingBox());
   const k = skey(S.season), weekAgo = Date.now() - 7 * 864e5;
   const rows = S.users.map(u => { const s = (u.summary && u.summary.seasons && u.summary.seasons[k]) || {}; return {u: u, s: s, kg: +s.kg || 0}; })
-    .sort((a, b) => b.kg - a.kg || String(a.u.name || a.u.email || '').localeCompare(String(b.u.name || b.u.email || ''), 'tr'));
+    .sort((a, b) => b.kg - a.kg || String(a.u.name || a.u.email || a.u.phone || '').localeCompare(String(b.u.name || b.u.email || b.u.phone || ''), 'tr'));
   const t = {kg: 0, val: 0, act: 0, hv: 0, byVar: {}, cal: {}, calVar: {}};
   rows.forEach(r => {
     t.kg += r.kg; t.val += +r.s.val || 0; if (r.kg > 0) t.hv++;
@@ -2175,7 +2272,7 @@ function vUsers(){
   h += sec('Kişiler', 'dokun, defterini salt okunur aç', rows.length ? '<div class="panel ulist">' + rows.map(r => {
     const u = r.u, s = r.s, me = S.user && u.uid === S.user.uid;
     const vars = Object.keys(s.byVar || {}).sort((a, b) => s.byVar[b] - s.byVar[a]).map(v => v + ' ' + num(s.byVar[v])).join(' · ');
-    return '<button type="button" class="urow" data-act="openUser" data-id="' + esc(u.uid) + '"><span class="un"><b>' + esc(u.name || u.email || 'İsimsiz') + (me ? ' <span class="chip">sen</span>' : '') + '</b><span>' + esc([u.place || u.farmName || '', vars || 'bu sezon hasat yok'].filter(Boolean).join(' · ')) + '</span><span class="us">' + esc([u.email && u.name ? u.email : '', s.last ? 'son hasat ' + fmtDs(s.last) : '', u.lastSeen ? 'son giriş ' + ago(u.lastSeen) : ''].filter(Boolean).join(' · ')) + '</span></span><span class="uk"><b>' + num(r.kg) + ' kg</b>' + (s.val ? '<span>' + tl(s.val) + '</span>' : '') + '</span><i aria-hidden="true">›</i></button>';
+    return '<button type="button" class="urow" data-act="openUser" data-id="' + esc(u.uid) + '"><span class="un"><b>' + esc(u.name || u.email || fmtPhone(u.phone) || 'İsimsiz') + (me ? ' <span class="chip">sen</span>' : '') + '</b><span>' + esc([u.place || u.farmName || '', vars || 'bu sezon hasat yok'].filter(Boolean).join(' · ')) + '</span><span class="us">' + esc([u.name ? (u.email || fmtPhone(u.phone)) : '', s.last ? 'son hasat ' + fmtDs(s.last) : '', u.lastSeen ? 'son giriş ' + ago(u.lastSeen) : ''].filter(Boolean).join(' · ')) + '</span></span><span class="uk"><b>' + num(r.kg) + ' kg</b>' + (s.val ? '<span>' + tl(s.val) + '</span>' : '') + '</span><i aria-hidden="true">›</i></button>';
   }).join('') + '</div>' : emptyBox('Henüz kullanıcı yok', 'Linki paylaştığın kişiler kayıt olunca burada görünür.', ''));
   const vars = Object.keys(t.byVar).filter(v => t.byVar[v] > 0).sort((a, b) => t.byVar[b] - t.byVar[a]);
   if (vars.length) {
@@ -2193,6 +2290,80 @@ function vUsers(){
   return h;
 }
 
+/* ---------- Sezon karşılaştırması ---------- */
+function seasonData(){
+  const keep = S.season, out = [];
+  try { seasonsList().forEach(s => { S.season = s; const d = derive(); if (d.oliveKg > 0 || d.cost > 0 || d.income > 0 || d.oilNet > 0) out.push({s: s, d: d}); }); }
+  finally { S.season = keep; }
+  return out;
+}
+function pastBarHTML(){
+  const cur = seasonOf(todayStr());
+  if (!S.season || S.season === cur || loading()) return '';
+  const has = D.oliveKg > 0 || D.cost > 0 || D.income > 0;
+  return '<div class="pastbar"><span><b>' + esc(S.season) + ' sezonuna bakıyorsun.</b> ' + (has ? 'Bu sezonu ' + esc(cur) + ' ile Karşılaştırma bölümünde yan yana görürsün.' : 'Geçen yılın hasat, masraf ve satışlarını buraya girersen ' + esc(cur) + ' ile karşılaştırabilirsin.') + '</span>' +
+    '<span class="pb-a"><a class="btn btn-sm" href="#karsilastir">Karşılaştırma</a><button type="button" class="btn btn-sm" data-act="goSeason" data-v="' + esc(cur) + '">' + esc(cur) + ' sezonuna dön</button></span></div>';
+}
+function vKarsilastir(){
+  const cur = seasonOf(todayStr()), prev = shiftSeason(cur, -1);
+  let h = '<div class="sh first"><h2>Sezon karşılaştırması</h2><span class="meta">sezonlar yan yana</span></div>';
+  if (loading()) return h + loadingBox();
+  const all = seasonData();
+  if (all.length < 2) {
+    const one = all.length ? all[0].s : null, target = one === prev ? cur : prev;
+    return h + emptyBox('Karşılaştırma için iki sezonun kaydı gerekir',
+      (one ? one + ' sezonunun kayıtları var. ' : '') + 'Üstteki sezon seçiciden ' + target + ' sezonunu seçip o yılın hasat, masraf ve satışlarını gir. İki sezon olunca burada yan yana görünür.',
+      '<button type="button" class="btn btn-p" data-act="goSeason" data-v="' + esc(target) + '">' + esc(target) + ' sezonuna geç</button>');
+  }
+  const cols = all.slice(0, 4), a = cols[0].d, b = cols[1].d;
+  const head = '<thead><tr><th></th>' + cols.map(c => '<th class="n">' + esc(c.s) + '</th>').join('') + '<th class="n">Değişim</th></tr></thead>';
+  const val = x => ok(x) && Math.abs(x) > 0.004 ? x : null;
+  const pct = (x, y) => { x = val(x); y = val(y); if (x == null || y == null || y < 0) return '–'; const p = (x - y) / y * 100; return Math.abs(p) < 0.5 ? 'aynı' : (p > 0 ? '+%' : '−%') + num(Math.abs(p)); };
+  const diff = (x, y, fmt) => { x = val(x); y = val(y); if (x == null || y == null) return '–'; const d = x - y; return Math.abs(d) < 0.005 ? 'aynı' : (d > 0 ? '+' : '−') + fmt(Math.abs(d)); };
+  const kg = v => num(v) + ' kg';
+  const M = [
+    ['Toplanan zeytin', d => d.oliveKg, kg],
+    ['Hasat günü', d => d.dayCount, v => num(v)],
+    ['Kişi-gün başı hasat', d => d.kgPerPD, kg],
+    ['Ağaç başı', d => d.trees && d.oliveKg ? d.oliveKg / d.trees : null, v => num(v, 1) + ' kg'],
+    ['Dönüm başı', d => d.area && d.oliveKg ? d.oliveKg / d.area : null, kg],
+    ['Tahmini ürün değeri', d => d.valTot, v => tl(v)],
+    ['Maliyet', d => d.cost, v => tl(v)],
+    ['Gelir', d => d.income, v => tl(v)],
+    ['Net', d => d.income ? d.income - d.cost : null, v => tl(v), 'diff'],
+    ['Maliyet / kg zeytin', d => d.oliveKg && d.cost ? d.cost / d.oliveKg : null, v => tl(v, 2)],
+    ['Yağ', d => d.oilNet, kg],
+    ['Randıman', d => d.yieldPct, v => '%' + num(v, 1), 'pt'],
+  ];
+  const rows = M.filter(m => cols.some(c => val(m[1](c.d)) != null)).map(m => {
+    const ch = m[3] === 'diff' ? diff(m[1](a), m[1](b), v => tl(v)) : m[3] === 'pt' ? diff(m[1](a), m[1](b), v => num(v, 1) + ' puan') : pct(m[1](a), m[1](b));
+    return '<tr><td>' + esc(m[0]) + '</td>' + cols.map(c => { const v = val(m[1](c.d)); return '<td class="n">' + (v == null ? '–' : esc(m[2](v))) + '</td>'; }).join('') + '<td class="n chg">' + esc(ch) + '</td></tr>';
+  }).join('');
+  const maxKg = Math.max.apply(null, cols.map(c => c.d.oliveKg)) || 1;
+  h += sec('Toplanan zeytin', esc(cols[0].s) + ' ile ' + esc(cols[1].s) + ': ' + esc(pct(a.oliveKg, b.oliveKg)), '<div class="panel bars">' + cols.map(c => '<div class="bar"><span>' + esc(c.s) + '</span><span class="n">' + num(c.d.oliveKg) + ' kg</span><span class="tr"><i class="h" style="width:' + Math.max(2, c.d.oliveKg / maxKg * 100).toFixed(1) + '%"></i></span></div>').join('') + '</div>');
+  h += sec('Özet', '“Değişim” ' + esc(cols[0].s) + ' sezonunu ' + esc(cols[1].s) + ' ile kıyaslar', '<div class="tw mx"><table>' + head + '<tbody>' + rows + '</tbody></table></div>');
+  const vars = [];
+  cols.forEach(c => Object.keys(c.d.byVar).forEach(v => { if (c.d.byVar[v].kg > 0.5 && vars.indexOf(v) < 0) vars.push(v); }));
+  const vk = (d, v) => d.byVar[v] ? d.byVar[v].kg : 0;
+  vars.sort((x, y) => vk(a, y) - vk(a, x) || vk(b, y) - vk(b, x));
+  if (vars.length) h += sec('Çeşitlere göre', 'kg', '<div class="tw mx"><table>' + head + '<tbody>' + vars.map(v => '<tr><td>' + esc(v) + '</td>' + cols.map(c => { const x = vk(c.d, v); return '<td class="n">' + (x > 0.5 ? num(x) : '–') + '</td>'; }).join('') + '<td class="n chg">' + esc(pct(vk(a, v), vk(b, v))) + '</td></tr>').join('') + '</tbody></table></div>');
+  const calT = d => CAL_KEYS.reduce((s, k) => s + (+d.calTot[k[0]] || 0), 0);
+  if (cols.some(c => calT(c.d) > 0)) {
+    const share = (d, k) => { const t = calT(d); return t > 0 ? (+d.calTot[k] || 0) / t * 100 : null; };
+    h += sec('Elek dağılımı', 'elek girilen hasatlarda, toplamın yüzdesi', '<div class="tw mx"><table>' + head + '<tbody>' + CAL_KEYS.map(k => {
+      const any = cols.some(c => (+c.d.calTot[k[0]] || 0) > 0.5);
+      const rs = (d, key) => { const s = share(d, key); return s == null ? null : Math.round(s); };
+      const sa = rs(a, k[0]), sb = rs(b, k[0]), dd = sa == null || sb == null || !any ? null : sa - sb;
+      return '<tr' + (any ? '' : ' class="z"') + '><td>' + esc(k[1]) + '</td>' + cols.map(c => { const s = rs(c.d, k[0]); return '<td class="n">' + (s == null || !((+c.d.calTot[k[0]] || 0) > 0.5) ? '–' : '%' + num(s)) + '</td>'; }).join('') + '<td class="n chg">' + (dd == null ? '–' : dd === 0 ? 'aynı' : (dd > 0 ? '+' : '−') + num(Math.abs(dd)) + ' puan') + '</td></tr>';
+    }).join('') + '</tbody></table></div>');
+  }
+  const ps = S.parcels.filter(p => cols.some(c => (c.d.PS[p.id] || {}).kg > 0.5) || p.active !== false).sort(byName);
+  const pk = (d, id) => (d.PS[id] || {}).kg || 0;
+  if (ps.length && cols.some(c => ps.some(p => pk(c.d, p.id) > 0.5))) h += sec('Bahçelere göre', 'kg', '<div class="tw mx"><table>' + head + '<tbody>' + ps.map(p => '<tr><td>' + esc(p.name) + '</td>' + cols.map(c => { const x = pk(c.d, p.id); return '<td class="n">' + (x > 0.5 ? num(x) : '–') + '</td>'; }).join('') + '<td class="n chg">' + esc(pct(pk(a, p.id), pk(b, p.id))) + '</td></tr>').join('') + '</tbody></table></div>');
+  h += '<p class="note-s">Ağaç ve dönüm başı verim, bahçelere bugün girili ağaç ve alan bilgisiyle hesaplanır. Maliyet, gelir ve yağ o sezonun tarihli kayıtlarından gelir.</p>';
+  return h;
+}
+
 /* ---------- Ayarlar ---------- */
 function storeText(){
   if (FBCFG && S.store === 'account') return '<p><b>Hesabına kaydediliyor.</b> Kayıtların sunucuda saklanır; telefonun değişse de aynı hesapla girince hepsi gelir. İnternet yokken de kayıt girebilirsin; bağlantı gelince gönderilir.</p><p>Kayıtlarını uygulamanın sahibi ' + esc(OWNER) + ' görebilir; başka kullanıcılar göremez.</p>';
@@ -2206,7 +2377,7 @@ function vAyarlar(){
   if (G) return '<div class="sh first"><h2>Ayarlar</h2><span class="meta">salt okunur defter</span></div><div class="panel set-form"><div class="prose"><p>Şu an <b>' + esc(G.name) + '</b> adlı kullanıcının defterine bakıyorsun' + (G.email ? ' (' + esc(G.email) + ')' : '') + '. Bu defterde hiçbir şeyi değiştiremezsin.</p></div><div class="set-acts"><button type="button" class="btn btn-p" data-act="guestExit">Kendi defterime dön</button><a class="btn" href="#kullanicilar">Kullanıcılar</a></div></div>';
   const v = Object.assign({}, S.settings, {seasonStart: String(startMonth())});
   let h = '<div class="sh first"><h2>Ayarlar</h2><span class="meta">işletme bilgisi, yedek ve paylaşım</span></div>';
-  if (FBCFG && S.user) h += '<div class="panel set-form"><div class="prose"><p><b>' + esc(S.user.name || (S.profile && S.profile.name) || 'Hesabın') + '</b>' + (S.user.email ? ' · ' + esc(S.user.email) : '') + (S.isAdmin ? ' · <span class="chip">yönetici</span>' : '') + '</p><p>Kullanıcı kimliğin: <span class="uid" id="myUid">' + esc(S.user.uid) + '</span></p></div><div class="set-acts"><button type="button" class="btn btn-sm" data-act="copyUid">Kimliği kopyala</button><button type="button" class="btn btn-sm" data-act="signOut">Çıkış yap</button></div></div>';
+  if (FBCFG && S.user) h += '<div class="panel set-form"><div class="prose"><p><b>' + esc(S.user.name || (S.profile && S.profile.name) || 'Hesabın') + '</b>' + (S.user.email || S.user.phone ? ' · ' + esc(S.user.email || fmtPhone(S.user.phone)) : '') + (S.isAdmin ? ' · <span class="chip">yönetici</span>' : '') + '</p><p>Kullanıcı kimliğin: <span class="uid" id="myUid">' + esc(S.user.uid) + '</span></p></div><div class="set-acts"><button type="button" class="btn btn-sm" data-act="copyUid">Kimliği kopyala</button><button type="button" class="btn btn-sm" data-act="signOut">Çıkış yap</button></div></div>';
   h += '<form class="panel set-form" id="setForm" novalidate><div class="fgrid">' + SETFIELDS.map(f => fieldHTML(f, v)).join('') + '</div><div class="ferr" id="setErr" hidden></div><div class="set-acts"><button type="submit" class="btn btn-p">Kaydet</button><button type="button" class="btn" data-act="prices">Fiyat listesi</button></div></form>';
   h += sec('Kayıtların nerede', '', '<div class="panel set-form"><div class="prose">' + storeText() + '</div></div>');
   h += sec('Yedek ve Excel', '', '<div class="panel set-form"><div class="prose"><p>Yedek dosyası bütün sezonları içerir; yeni telefonda “Yedeği yükle” ile aynı defteri açarsın. Excel dosyaları noktalı virgülle ayrılmış tablodur, Excel doğrudan açar.</p></div><div class="set-acts">' + (canDL() ? '<button type="button" class="btn btn-p" data-act="json">Yedek indir</button>' : '<button type="button" class="btn btn-p" data-act="copyJSON">Yedeği kopyala</button>') + '<button type="button" class="btn" data-act="import">Yedeği yükle</button>' + (canDL() ? '<button type="button" class="btn" data-act="hcsv">Hasat tablosu (Excel)</button><button type="button" class="btn" data-act="csv">Bütün kayıtlar (Excel)</button>' : '') + '</div></div>');
@@ -2219,7 +2390,8 @@ function vAyarlar(){
 /* ---------- çizim ---------- */
 let raf = 0, lastW = 0, lastGate = '';
 function schedule(){ if (raf) return; raf = requestAnimationFrame(() => { raf = 0; render(); }); setTimeout(() => { if (raf) { cancelAnimationFrame(raf); raf = 0; render(); } }, 250); }
-const VIEWS = {pano: vPano, hasat: vHasat, defter: vDefter, bahceler: vBahceler, ekip: vEkip, yag: vYag, depo: vDepo, takvim: vTakvim, ayarlar: vAyarlar, kullanicilar: vUsers};
+const VIEWS = {pano: vPano, hasat: vHasat, defter: vDefter, bahceler: vBahceler, ekip: vEkip, yag: vYag, depo: vDepo, takvim: vTakvim, karsilastir: vKarsilastir, ayarlar: vAyarlar, kullanicilar: vUsers};
+const PAST_BAR = new Set(['pano', 'hasat', 'defter', 'bahceler', 'ekip', 'yag']);
 function render(){
   if (!S.season) S.season = seasonOf(todayStr());
   D = derive();
@@ -2257,9 +2429,9 @@ function render(){
   else if ((!S.isAdmin || gate) && ut) ut.remove();
   const view = $('#view'), ae = document.activeElement;
   const aid = ae && ae.id && view.contains(ae) ? ae.id : null, selS = aid && typeof ae.selectionStart === 'number' ? ae.selectionStart : null;
-  const gateKey = gate ? S.auth + ':' + S.authTab : '';
+  const gateKey = gate ? [S.auth, S.authTab, S.authM, S.ph ? 'kod' : 'no'].join(':') : '';
   const keep = (!gate && S.view === 'ayarlar' && aid && aid.indexOf('f-') === 0) || (gate && aid && aid.indexOf('a-') === 0 && gateKey === lastGate);
-  if (!keep) view.innerHTML = (gate ? authHTML() : (VIEWS[S.view] || vPano)()) + footHTML();
+  if (!keep) view.innerHTML = (gate ? authHTML() : (PAST_BAR.has(S.view) ? pastBarHTML() : '') + (VIEWS[S.view] || vPano)()) + footHTML();
   lastGate = gateKey;
   $$('#tabs a, #bnav a').forEach(a => { if (a.dataset.view === S.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('#bnavMore').classList.toggle('on', S.view === 'kullanicilar' || MORE.some(m => m[0] === S.view));
@@ -2363,13 +2535,15 @@ function openForm(kind, id, preset){
   if (id && !doc) { toast('Kayıt bulunamadı; silinmiş olabilir.'); return; }
   const v = Object.assign({}, F.defaults || {}, preset || {}, doc || {});
   if (F.load) F.load(doc || {}, v);
-  if (!doc && F.fields.some(f => f.k === 'date') && !v.date) v.date = todayStr();
+  if (!doc && F.fields.some(f => f.k === 'date') && !v.date) v.date = defDate();
+  const pastS = !doc && v.date ? seasonOf(v.date) : null;
+  const pastN = pastS && pastS !== seasonOf(todayStr()) ? '<p class="past-n"><b>' + esc(pastS) + ' sezonuna kayıt giriyorsun.</b> Tarihi fişteki güne göre düzelt.</p>' : '';
   if (!doc && !(preset && preset.parcels)) {
     const pf = F.fields.find(f => f.t === 'parcels' && f.req), act = S.parcels.filter(p => p.active !== false);
     if (pf && act.length === 1) { v.parcels = [act[0].id]; if (kind === 'rec:hasat' && !v.variety && VARIETIES.indexOf(act[0].variety) >= 0) v.variety = act[0].variety; }
   }
   S.sheet = {kind: kind, id: id || null, F: F, doc: doc};
-  const body = '<form id="frm" novalidate autocomplete="off"><fieldset class="fs"><div class="fgrid">' + F.fields.map(f => fieldHTML(f, v)).join('') + '</div></fieldset><div class="calc" id="calc" aria-live="polite"></div><div class="ferr" id="ferr" role="alert" hidden></div>' + footer(!!doc) + '</form>';
+  const body = '<form id="frm" novalidate autocomplete="off">' + pastN + '<fieldset class="fs"><div class="fgrid">' + F.fields.map(f => fieldHTML(f, v)).join('') + '</div></fieldset><div class="calc" id="calc" aria-live="polite"></div><div class="ferr" id="ferr" role="alert" hidden></div>' + footer(!!doc) + '</form>';
   showSheet(doc ? 'Kaydı düzenle · ' + F.eyebrow : 'Yeni kayıt · ' + F.eyebrow, F.title, body, false);
   const form = $('#frm');
   if (doc) $$('input[type=text], textarea', form).forEach(el => { if (el.value.trim()) el.dataset.touched = '1'; });
@@ -2582,7 +2756,7 @@ function closeSheet(){
   const f = S.lastFocus; S.lastFocus = null;
   if (f && document.body.contains(f)) { try { f.focus({preventScroll: true}); } catch (e) {} }
 }
-const MORE = [['bahceler', 'Bahçeler', 'Alan, ağaç, hasat durumu'], ['ekip', 'Ekip', 'İşçiler, yevmiye, ödemeler'], ['yag', 'Yağ ve satış', 'Fabrika fişi, satış, elde kalan yağ'], ['depo', 'Depo', 'İlaç, gübre, malzeme'], ['takvim', 'Takvim', 'Yapılacaklar, zeytin bakım takvimi'], ['ayarlar', 'Ayarlar', 'İşletme, fiyat listesi, yedek']];
+const MORE = [['bahceler', 'Bahçeler', 'Alan, ağaç, hasat durumu'], ['karsilastir', 'Sezon karşılaştırması', 'Bu yıl ile geçen yıl yan yana'], ['ekip', 'Ekip', 'İşçiler, yevmiye, ödemeler'], ['yag', 'Yağ ve satış', 'Fabrika fişi, satış, elde kalan yağ'], ['depo', 'Depo', 'İlaç, gübre, malzeme'], ['takvim', 'Takvim', 'Yapılacaklar, zeytin bakım takvimi'], ['ayarlar', 'Ayarlar', 'İşletme, fiyat listesi, yedek']];
 function openMore(){
   const items = (S.isAdmin && FBCFG ? [['kullanicilar', 'Kullanıcılar', 'Bütün kullanıcıların defterleri']] : []).concat(MORE);
   const body = '<div class="sheet-body"><div class="more">' + items.map(m => '<button type="button" class="more-i" data-act="goView" data-v="' + m[0] + '"' + (S.view === m[0] ? ' aria-current="page"' : '') + '><b>' + esc(m[1]) + '</b><span>' + esc(m[2]) + '</span><i aria-hidden="true">›</i></button>').join('') + '</div></div>';
@@ -2612,7 +2786,7 @@ async function saveSettings(form){
 }
 document.addEventListener('toggle', e => { const t = e.target; if (t && t.classList && t.classList.contains('mx')) S.mxOpen = t.open; }, true);
 window.addEventListener('hashchange', () => { if (S.sheet) closeSheet(); setView(location.hash.replace('#', '')); });
-const GUEST_OK = new Set(['more', 'varSel', 'goVar', 'goView', 'close', 'parcel', 'hideNote', 'fg', 'fclear', 'hcsv', 'csv', 'guestExit', 'openUser', 'signOut', 'reload', 'copyUid']);
+const GUEST_OK = new Set(['goSeason', 'more', 'varSel', 'goVar', 'goView', 'close', 'parcel', 'hideNote', 'fg', 'fclear', 'hcsv', 'csv', 'guestExit', 'openUser', 'signOut', 'reload', 'copyUid']);
 const RO_MSG = 'Bu defter salt okunur; değişiklik yapamazsın.';
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
@@ -2620,6 +2794,10 @@ document.addEventListener('click', e => {
   if (G && !GUEST_OK.has(act)) { toast(RO_MSG); return; }
   if (act === 'gSign') return doGoogle();
   if (act === 'authTab') { S.authTab = t.dataset.v === 'up' ? 'up' : 'in'; S.authErr = ''; return render(); }
+  if (act === 'goSeason') { S.season = t.dataset.v; S.seasonPicked = true; if (S.view === 'pano') { render(); window.scrollTo(0, 0); } else location.hash = 'pano'; return; }
+  if (act === 'authM') { S.authM = t.dataset.v === 'email' ? 'email' : 'phone'; try { localStorage.setItem(LS_AUTHM, S.authM); } catch (x) {} S.authErr = ''; return render(); }
+  if (act === 'phResend') return phResend();
+  if (act === 'phBack') return phBack();
   if (act === 'pwReset') return doReset();
   if (act === 'signOut') return doSignOut();
   if (act === 'reload') return location.reload();
@@ -2702,6 +2880,8 @@ document.addEventListener('submit', e => {
   e.preventDefault();
   const id = e.target.id;
   if (id === 'authForm') return doAuth(e.target);
+  if (id === 'phoneForm') return doPhoneSend();
+  if (id === 'codeForm') return doPhoneCode(e.target);
   if (id === 'consentForm') { const f = e.target; if (!f.elements.ok.checked) return authErr('Devam etmek için onay kutusunu işaretle.'); authBusy(true); return saveConsent(f.elements.name.value.trim()); }
   if (G) { toast(RO_MSG); return; }
   if (id === 'frm') return submitForm(false);
