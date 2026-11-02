@@ -776,9 +776,14 @@ function seasonsList(){
 /* ---------- hasat hesapları ---------- */
 const calSum = r => r && r.cal ? CAL_KEYS.reduce((a, k) => a + (+r.cal[k[0]] || 0), 0) : 0;
 const calMismatch = r => { const cs = calSum(r); return cs > 0 && Math.abs(cs - (+r.kg || 0)) > 0.5; };
-function priceRow(v){ const p = v ? (S.settings.prices || {})[v] : null; return p && typeof p === 'object' && Object.keys(p).some(k => +p[k] > 0) ? p : null; }
+const hasPrice = p => !!(p && typeof p === 'object' && Object.keys(p).some(k => +p[k] > 0));
+function priceRow(v){ const p = v ? (S.settings.prices || {})[v] : null; return hasPrice(p) ? p : null; }
+/* Hasat kendi gün fiyatını taşıyorsa o kullanılır; eski kayıtlarda fiyat listesi */
+function recPrice(r){ return hasPrice(r.prices) ? r.prices : priceRow(r.variety); }
+/* Yazılan fiyat, yoksa listedeki fiyat (elek elek) */
+function mergePrices(own, list){ const o = {}; CAL_KEYS.forEach(k => { const a = own ? +own[k[0]] : 0, b = list ? +list[k[0]] : 0; o[k[0]] = a > 0 ? a : b > 0 ? b : null; }); return hasPrice(o) ? o : null; }
 function valueOf(r){
-  const p = priceRow(r.variety); if (!p) return null;
+  const p = recPrice(r); if (!p) return null;
   if (calSum(r) > 0) { let v = 0, any = false; CAL_KEYS.forEach(k => { const q = +r.cal[k[0]] || 0, pr = +p[k[0]] || 0; if (q && pr) { v += q * pr; any = true; } }); return any ? v : null; }
   if (r.purpose === 'Yağlık' && +p.y > 0 && +r.kg > 0) return r.kg * p.y;
   return null;
@@ -838,6 +843,8 @@ TYPES.hasat.fields = [FD.date,
   {k: 'purpose', label: 'Amaç', t: 'pills', opts: O.hasatAmac, full: true},
   {k: 'cal', label: 'Elekler', t: 'cal', full: true, show: v => v.purpose !== 'Yağlık', hint: 'Tüccarın ya da fabrikanın elek fişindeki kilolar. Boş bıraktığın elek sıfır sayılır.'},
   {k: 'kg', label: 'Toplam zeytin', t: 'num', unit: 'kg', req: true, hint: 'Elekleri girersen kendiliğinden toplanır.'},
+  {k: 'prices', label: 'Bu hasadın fiyatları', t: 'prc', full: true, hint: 'Tüccarın bugün verdiği kilo fiyatı. Boş bıraktığın elek fiyat listesindeki son fiyatla hesaplanır. Fiyatlar bu hasada kaydedilir; listeyi sonra değiştirsen de bu günün değeri değişmez.'},
+  {k: 'pricesToList', label: 'Fiyat listesi', t: 'check', text: 'Bu fiyatları fiyat listesine de yaz (sonraki hasatlar bunlarla açılsın)', full: true},
   {k: 'workers', label: 'Çalışan kişi (aile dahil)', t: 'num', unit: 'kişi'},
   {k: 'crates', label: 'Kasa / çuval', t: 'num', unit: 'adet'},
   {k: 'method', label: 'Yöntem', t: 'select', opts: O.hasatYontem},
@@ -853,9 +860,12 @@ TYPES.hasat.calc = (v, c) => {
   const out = [];
   ps.forEach(p => { const st = D.PS[p.id]; if (st && st.safe && v.date && v.date < st.safe) out.push(cl(esc(p.name) + ': son ilaçlamanın bekleme süresi <b>' + fmtD(st.safe) + '</b> tarihinde doluyor. Bu tarihten önce hasat etme.', 'bad')); });
   if (cs > 0 && ok(kg) && Math.abs(cs - kg) > 0.5) out.push(cl('Eleklerin toplamı <b>' + num(cs, 1) + ' kg</b>, toplam <b>' + num(kg, 1) + ' kg</b> yazılı.<button type="button" class="btn btn-sm" data-act="kgFromCal">Toplamı ' + num(cs, 1) + ' kg yap</button>', 'warn'));
-  const val = valueOf(Object.assign({}, v, {kg: kg}));
-  if (val) out.push(cl('Tahmini değer <b>' + tl(val) + '</b> · ' + esc(v.variety) + ' fiyat listesine göre', 'good'));
-  else if (cs > 0 && v.variety && !priceRow(v.variety)) out.push(cl('Fiyat listesinde ' + esc(v.variety) + ' yok. Hasat sekmesindeki fiyat listesine eklersen tahmini değer hesaplanır.'));
+  const lp = priceRow(v.variety), yag = v.purpose === 'Yağlık';
+  $$('#frm [data-pk]').forEach(el => { const k = el.dataset.pk, inp = el.querySelector('input'); el.hidden = yag && k !== 'y'; if (inp) inp.placeholder = lp && +lp[k] > 0 ? numIn(+lp[k]) : ''; });
+  const ownP = hasPrice(v.prices), eff = mergePrices(v.prices, lp);
+  const val = valueOf(Object.assign({}, v, {kg: kg, prices: eff}));
+  if (val) out.push(cl('Tahmini değer <b>' + tl(val) + '</b> · ' + (ownP ? 'bu hasadın fiyatlarıyla' : esc(v.variety) + ' fiyat listesine göre'), 'good'));
+  else if ((cs > 0 || yag) && !eff) out.push(cl((v.variety ? 'Fiyat listesinde ' + esc(v.variety) + ' yok. ' : '') + '“Bu hasadın fiyatları” alanına bugünün fiyatını yazarsan tahmini değer hesaplanır.'));
   if (v.date && ok(kg) && kg > 0) {
     const others = S.records.filter(r => r.type === 'hasat' && r.date === v.date && !(c.editing && r.id === c.doc.id));
     if (others.length) {
@@ -1149,6 +1159,19 @@ const FORMS = {
       {k: 'done', label: 'Durum', t: 'check', text: 'Tamamlandı', full: true},
       FD.note],
   },
+};
+/* Hasadın gün fiyatı: yazılan fiyat, yoksa o anki listedeki fiyat kayda yazılır. İstenirse liste de güncellenir. */
+TYPES.hasat.prepare = async data => {
+  const own = hasPrice(data.prices) ? data.prices : null, toList = !!data.pricesToList;
+  delete data.pricesToList;
+  data.prices = mergePrices(own, priceRow(data.variety));
+  if (toList && own && data.variety) {
+    const prices = Object.assign({}, S.settings.prices || {}), row = Object.assign({}, prices[data.variety] || {});
+    CAL_KEYS.forEach(k => { if (+own[k[0]] > 0) row[k[0]] = +own[k[0]]; });
+    prices[data.variety] = row;
+    await putSettings(Object.assign({}, S.settings, {prices: prices, pricesAt: todayStr(), updatedAt: new Date().toISOString()}));
+  }
+  return data;
 };
 Object.keys(TYPES).forEach(k => { const t = TYPES[k]; FORMS['rec:' + k] = {col: 'records', type: k, title: t.label, eyebrow: GROUPS[t.g], fields: t.fields, calc: t.calc, validate: t.validate, prepare: t.prepare, defaults: {}}; });
 FORMS['rec:sikim'].defaults = {feeType: 'TL'};
@@ -1451,6 +1474,7 @@ function fbMsg(e){
     'auth/session-expired': 'Kodun süresi doldu. “Kodu tekrar gönder”e dokun.',
     'auth/captcha-check-failed': 'Güvenlik doğrulaması geçilemedi. Sayfayı yenileyip tekrar dene.',
     'auth/invalid-app-credential': 'Güvenlik doğrulaması geçilemedi. Sayfayı yenileyip tekrar dene.',
+    'auth/error-code:-39': 'Bu numaraya şu an kod gönderilemiyor; kısa sürede çok deneme yapılmış olabilir. Birkaç saat sonra bir kez dene ya da Google veya e-postayla gir.',
     'auth/billing-not-enabled': 'Telefonla giriş henüz açılmadı (Firebase’de Blaze planı gerekiyor). Şimdilik Google ya da e-postayla gir.',
     'permission-denied': 'Sunucu izin vermedi. Firestore kurallarını kontrol et.',
     'unavailable': 'Sunucuya ulaşılamadı. İnternetini kontrol et.',
@@ -1691,7 +1715,7 @@ function derive(){
     const pk = r.purpose || 'Belirtilmemiş'; byPurpose[pk] = (byPurpose[pk] || 0) + own;
     const vk = r.variety || 'Çeşit girilmemiş', vo = byVar[vk] || (byVar[vk] = {kg: 0, val: 0, vkg: 0}); vo.kg += own; vo.val += (val || 0) * sh; if (val) vo.vkg += own;
     if (r.cal) {
-      const pr = priceRow(r.variety), cvar = calVar[vk] || (calVar[vk] = {}), vvar = calValVar[vk] || (calValVar[vk] = {});
+      const pr = recPrice(r), cvar = calVar[vk] || (calVar[vk] = {}), vvar = calValVar[vk] || (calValVar[vk] = {});
       CAL_KEYS.forEach(k => {
         const key = k[0], q = (+r.cal[key] || 0) * sh; if (!q) return;
         calTot[key] = (calTot[key] || 0) + q; calAll += q;
@@ -2445,7 +2469,7 @@ const optList = (list, val) => list.map(o => { const v = Array.isArray(o) ? o[0]
 function fieldHTML(f, v){
   const id = 'f-' + f.k, val = v[f.k];
   const star = f.req ? '<span class="req" aria-hidden="true">*</span>' : '';
-  const grp = ['pills', 'parcels', 'crew', 'cal'].indexOf(f.t) >= 0;
+  const grp = ['pills', 'parcels', 'crew', 'cal', 'prc'].indexOf(f.t) >= 0;
   const lab = grp ? '<span class="lbl" id="l-' + f.k + '">' + esc(f.label) + star + '</span>' : (f.t === 'check' ? '<span class="lbl">' + esc(f.label) + '</span>' : '<label for="' + id + '">' + esc(f.label) + star + '</label>');
   let c = '';
   switch (f.t) {
@@ -2456,6 +2480,7 @@ function fieldHTML(f, v){
     case 'select': c = '<select id="' + id + '" name="' + f.k + '">' + (f.noEmpty ? '' : '<option value="">' + esc(f.none || 'Seç') + '</option>') + optList(f.opts, val) + '</select>'; break;
     case 'pills': { const cur = val || f.opts[0]; c = '<div class="pills" role="radiogroup" aria-labelledby="l-' + f.k + '">' + f.opts.map(o => '<label class="pill"><input type="radio" name="' + f.k + '" value="' + esc(o) + '"' + (o === cur ? ' checked' : '') + '><span>' + esc(o) + '</span></label>').join('') + '</div>'; break; }
     case 'check': c = '<label class="check"><input id="' + id + '" type="checkbox" name="' + f.k + '"' + (val ? ' checked' : '') + '><span>' + esc(f.text || '') + '</span></label>'; break;
+    case 'prc': { const pv = val || {}; c = '<div class="calg prc" role="group" aria-labelledby="l-' + f.k + '">' + CAL_KEYS.map(k => { const q = toNum(pv[k[0]]); return '<label class="cal-i" data-pk="' + k[0] + '" for="f-prc-' + k[0] + '"><span>' + esc(k[1]) + '</span><span class="inp-u"><input id="f-prc-' + k[0] + '" name="prc_' + k[0] + '" type="text" inputmode="decimal" value="' + esc(q ? numIn(q) : '') + '" autocomplete="off"><span class="u">₺</span></span></label>'; }).join('') + '</div>'; break; }
     case 'cal': { const cv = val || {}; c = '<div class="calg" role="group" aria-labelledby="l-' + f.k + '">' + CAL_KEYS.map(k => { const q = toNum(cv[k[0]]); return '<label class="cal-i" for="f-cal-' + k[0] + '"><span>' + esc(k[1]) + '</span><span class="inp-u"><input id="f-cal-' + k[0] + '" name="cal_' + k[0] + '" type="text" inputmode="decimal" value="' + esc(q ? numIn(q) : '') + '" autocomplete="off"><span class="u">kg</span></span></label>'; }).join('') + '</div>'; break; }
     case 'parcels': {
       const sel = new Set(val || []);
@@ -2499,6 +2524,7 @@ function collect(form, fields){
     if (f.t === 'crew') { v.entries = $$('.crew-r', form).map(row => { const p = row.querySelector('[aria-pressed="true"]'); return {w: row.dataset.w, u: p ? Number(p.dataset.u) : 0, wage: toNum(row.querySelector('[data-wage]').value)}; }).filter(e => e.u > 0); return; }
     if (f.t === 'parcels') { v[f.k] = $$('input[name="' + f.k + '"]:checked', form).map(i => i.value); return; }
     if (f.t === 'pills') { const c = form.querySelector('input[name="' + f.k + '"]:checked'); v[f.k] = c ? c.value : ''; return; }
+    if (f.t === 'prc') { const o = {}; let any = false; CAL_KEYS.forEach(k => { const el = form.elements['prc_' + k[0]], n = el ? toNum(el.value) : null; o[k[0]] = n; if (n) any = true; }); v[f.k] = any ? o : null; return; }
     if (f.t === 'cal') { const o = {}; let any = false; CAL_KEYS.forEach(k => { const el = form.elements['cal_' + k[0]], n = el ? toNum(el.value) : null; o[k[0]] = n; if (n) any = true; }); v[f.k] = any ? o : null; return; }
     const el = form.elements[f.k]; if (!el) return;
     if (f.t === 'check') v[f.k] = !!el.checked;
@@ -2558,12 +2584,13 @@ function setBusy(b, label){ $$('#sfoot button').forEach(x => { x.disabled = b; }
 async function submitForm(more){
   const sh = S.sheet; if (!sh || !sh.F) return;
   const form = $('#frm'), F = sh.F, v = collect(form, F.fields);
-  F.fields.forEach(f => { if (f.show && !f.show(v)) v[f.k] = (f.t === 'num' || f.t === 'money' || f.t === 'cal') ? null : (f.t === 'parcels' ? [] : ''); });
+  F.fields.forEach(f => { if (f.show && !f.show(v)) v[f.k] = (f.t === 'num' || f.t === 'money' || f.t === 'cal' || f.t === 'prc') ? null : (f.t === 'parcels' ? [] : ''); });
   const miss = F.fields.filter(f => f.req && (!f.show || f.show(v)) && isEmpty(f.t === 'crew' ? v.entries : v[f.k]));
   if (miss.length) return showErr('Eksik: ' + miss.map(f => f.label).join(', '));
   const bad = F.fields.filter(f => (f.t === 'num' || f.t === 'money') && v[f.k] != null && v[f.k] < 0);
   if (bad.length) return showErr('Eksi değer olamaz: ' + bad.map(f => f.label).join(', '));
   if (v.cal && Object.keys(v.cal).some(k => ok(v.cal[k]) && v.cal[k] < 0)) return showErr('Elek kilosu eksi olamaz.');
+  if (v.prices && Object.keys(v.prices).some(k => ok(v.prices[k]) && v.prices[k] < 0)) return showErr('Fiyat eksi olamaz.');
   if (F.validate) { const m = F.validate(v); if (m) return showErr(m); }
   showErr('');
   let data = Object.assign({}, sh.doc || {}, v);
@@ -2622,7 +2649,7 @@ function openPrices(extra, keep){
   const val = (v, k) => keep && keep[v] && keep[v][k] != null ? keep[v][k] : (prices[v] ? prices[v][k] : null);
   const others = VARIETIES.filter(v => vars.indexOf(v) < 0 && v !== 'Karışık' && v !== 'Diğer');
   S.sheet = {kind: 'prices', vars: vars};
-  const body = '<form id="pfrm" novalidate autocomplete="off"><div class="sheet-body"><p>Çeşit ve eleğe göre kilo fiyatı (₺). Her hasadın elek kiloları bu fiyatlarla çarpılır; yağlık hasatta “Yağlık (Y)” fiyatı kullanılır. Boş bıraktığın fiyat hesaba girmez.</p>' +
+  const body = '<form id="pfrm" novalidate autocomplete="off"><div class="sheet-body"><p>Çeşit ve eleğe göre kilo fiyatı (₺). Her hasadın elek kiloları bu fiyatlarla çarpılır; yağlık hasatta “Yağlık (Y)” fiyatı kullanılır. Boş bıraktığın fiyat hesaba girmez.</p><p>Listeyi değiştirmek daha önce girilen hasatların değerini değiştirmez; her hasat kendi gününün fiyatını saklar. Liste, yeni hasatlarda başlangıç fiyatıdır.</p>' +
     '<div class="ptw"><table class="ptab"><thead><tr><th>Elek</th>' + vars.map(v => '<th>' + esc(v) + '</th>').join('') + '</tr></thead><tbody>' + CAL_KEYS.map(k => '<tr><td>' + esc(k[1]) + '</td>' + vars.map(v => '<td><input type="text" inputmode="decimal" data-pv="' + esc(v) + '" data-pk="' + k[0] + '" aria-label="' + esc(v + ' ' + k[1]) + ' fiyatı" value="' + esc(numIn(toNum(val(v, k[0])))) + '"></td>').join('') + '</tr>').join('') + '</tbody></table></div>' +
     (others.length ? '<div class="field" style="margin-top:14px;max-width:280px"><label for="addVar">Çeşit ekle</label><select id="addVar"><option value="">Seç</option>' + optList(others, '') + '</select></div>' : '') +
     '<div class="ferr" id="ferr" role="alert" hidden></div></div><footer class="sheet-f" id="sfoot"><span class="sp"></span><button type="button" class="btn" data-act="close">Vazgeç</button><button type="submit" class="btn btn-p" id="saveBtn">Kaydet</button></footer></form>';
@@ -2637,7 +2664,15 @@ async function savePrices(form){
   const prices = readPrices(form);
   if (Object.keys(prices).some(v => Object.keys(prices[v]).some(k => prices[v][k] < 0))) return showErr('Fiyat eksi olamaz.');
   setBusy(true);
-  try { await putSettings(Object.assign({}, S.settings, {prices: prices, pricesAt: todayStr(), updatedAt: new Date().toISOString()})); closeSheet(); toast('Fiyat listesi kaydedildi'); }
+  try {
+    /* Gün fiyatı olmayan eski hasatlar şimdiye kadar listeyle hesaplanıyordu: liste değişmeden önce o fiyatları kayda yaz ki değerleri değişmesin. */
+    const stamp = S.records.filter(r => r.type === 'hasat' && !hasPrice(r.prices) && priceRow(r.variety)).map(r => {
+      const was = priceRow(r.variety), now = prices[r.variety] || null;
+      return CAL_KEYS.some(k => (+was[k[0]] || 0) !== (+(now && now[k[0]]) || 0)) ? dbUpdate('records', r.id, {prices: mergePrices(null, was)}) : null;
+    }).filter(Boolean);
+    await Promise.all(stamp);
+    await putSettings(Object.assign({}, S.settings, {prices: prices, pricesAt: todayStr(), updatedAt: new Date().toISOString()})); closeSheet(); toast('Fiyat listesi kaydedildi');
+  }
   catch (e) { setBusy(false); showErr(writeMsg(e)); }
 }
 
