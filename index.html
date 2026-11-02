@@ -151,6 +151,7 @@ td.chg{color:var(--ink-2)}
 .kpi .v{font-family:var(--f-num);font-weight:600;font-size:clamp(18px,2.6vw,23px);margin-top:5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.2}
 .kpi .s{font-size:12.5px;color:var(--ink-3);margin-top:3px}
 .v.pos{color:var(--good)} .v.neg{color:var(--bad)}
+td.n.neg{color:var(--bad)}
 @media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{padding:12px 13px}}
 
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 24px}
@@ -837,6 +838,8 @@ function stockLeft(c, it, field){
   return it.qty + (field === 'qtyUsed' ? back : -back);
 }
 
+/* Düzenlenen hasadın bağlı satış kaydı var mı */
+const hasSale = () => !!(S.sheet && S.sheet.doc && S.sheet.doc.saleId);
 TYPES.hasat.fields = [FD.date,
   Object.assign({}, FD.parcels, {hint: 'Aynı gün birden çok bahçeden topladıysan her bahçeyi ayrı kayıt olarak gir.'}),
   {k: 'variety', label: 'Çeşit', t: 'select', opts: VARIETIES},
@@ -849,6 +852,10 @@ TYPES.hasat.fields = [FD.date,
   {k: 'crates', label: 'Kasa / çuval', t: 'num', unit: 'adet'},
   {k: 'method', label: 'Yöntem', t: 'select', opts: O.hasatYontem},
   {k: 'dest', label: 'Nereye gitti', t: 'select', opts: O.hasatHedef},
+  {k: 'sold', label: 'Satış', t: 'check', text: 'Bu zeytini sattım (satış kaydı da açılsın)', full: true, show: () => !hasSale()},
+  {k: 'saleStatus', label: 'Ödeme', t: 'pills', opts: O.tahsil, full: true, show: v => !!v.sold && !hasSale()},
+  {k: 'saleDue', label: 'Vade', t: 'date', show: v => !!v.sold && !hasSale() && v.saleStatus === 'Vadeli'},
+  {k: 'buyer', label: 'Alıcı (isteğe bağlı)', t: 'text', ph: 'boş kalırsa “Nereye gitti”', show: v => !!v.sold && !hasSale()},
   {k: 'mHours', label: 'Makine saati', t: 'num', unit: 'saat'},
   Object.assign({}, FD.cost, {label: 'Diğer giderler', hint: 'Nakliye, kasa vb. İşçilik Ekip sekmesindeki yevmiyeden gelir.'}), FD.note];
 TYPES.hasat.calc = (v, c) => {
@@ -866,6 +873,8 @@ TYPES.hasat.calc = (v, c) => {
   const val = valueOf(Object.assign({}, v, {kg: kg, prices: eff}));
   if (val) out.push(cl('Tahmini değer <b>' + tl(val) + '</b> · ' + (ownP ? 'bu hasadın fiyatlarıyla' : esc(v.variety) + ' fiyat listesine göre'), 'good'));
   else if ((cs > 0 || yag) && !eff) out.push(cl((v.variety ? 'Fiyat listesinde ' + esc(v.variety) + ' yok. ' : '') + '“Bu hasadın fiyatları” alanına bugünün fiyatını yazarsan tahmini değer hesaplanır.'));
+  if (v.sold && !hasSale()) out.push(val ? cl('Kaydedince <b>' + tl(val) + '</b> tutarında satış kaydı da açılır' + (v.saleStatus === 'Vadeli' ? '; vadeli olduğu için alacaklarda görünür' : '') + '.', 'good') : cl('Satış kaydı için elek kilolarını ve o günün fiyatlarını gir.', 'warn'));
+  if (hasSale()) out.push(cl('Bu hasadın satış kaydı var. Kilo ya da fiyat değişirse satış kaydını Defter’den de düzelt.'));
   if (v.date && ok(kg) && kg > 0) {
     const others = S.records.filter(r => r.type === 'hasat' && r.date === v.date && !(c.editing && r.id === c.doc.id));
     if (others.length) {
@@ -1162,6 +1171,8 @@ const FORMS = {
 };
 /* Hasadın gün fiyatı: yazılan fiyat, yoksa o anki listedeki fiyat kayda yazılır. İstenirse liste de güncellenir. */
 TYPES.hasat.prepare = async data => {
+  S.pendingSale = data.sold && !data.saleId ? {status: data.saleStatus || 'Tahsil edildi', due: data.saleStatus === 'Vadeli' ? (data.saleDue || null) : null, buyer: String(data.buyer || '').trim()} : null;
+  ['sold', 'saleStatus', 'saleDue', 'buyer'].forEach(k => { delete data[k]; });
   const own = hasPrice(data.prices) ? data.prices : null, toList = !!data.pricesToList;
   delete data.pricesToList;
   data.prices = mergePrices(own, priceRow(data.variety));
@@ -1173,12 +1184,28 @@ TYPES.hasat.prepare = async data => {
   }
   return data;
 };
-Object.keys(TYPES).forEach(k => { const t = TYPES[k]; FORMS['rec:' + k] = {col: 'records', type: k, title: t.label, eyebrow: GROUPS[t.g], fields: t.fields, calc: t.calc, validate: t.validate, prepare: t.prepare, defaults: {}}; });
+/* "Bu zeytini sattım": hasat kaydedilince aynı kilo ve gün fiyatıyla satış kaydı açılır, hasada bağlanır. */
+TYPES.hasat.validate = v => {
+  if (v.sold && !hasSale() && !valueOf(Object.assign({}, v, {prices: mergePrices(v.prices, priceRow(v.variety))}))) return 'Satış kaydı için tutar hesaplanamadı: elek kilolarını ve o günün fiyatlarını gir.';
+  return null;
+};
+TYPES.hasat.after = async (data, id) => {
+  const sale = S.pendingSale; S.pendingSale = null;
+  const val = sale && id ? valueOf(data) : null, kg = +data.kg || 0;
+  if (!val) return null;
+  const names = (data.parcels || []).map(pid => PMAP[pid] ? PMAP[pid].name : '').filter(Boolean).join(', '), now = new Date().toISOString();
+  const sid = await dbSet('records', null, {type: 'satis', date: data.date, cat: data.purpose === 'Yağlık' ? 'Yağlık zeytin' : 'Sofralık zeytin', buyer: sale.buyer || data.dest || '', qty: kg, unit: 'kg',
+    price: kg ? Math.round(val / kg * 100) / 100 : null, total: Math.round(val * 100) / 100, status: sale.status, due: sale.due, parcels: data.parcels || [],
+    note: 'Hasattan' + (names ? ': ' + names : '') + (data.variety ? ' · ' + data.variety : ''), fromHarvest: id, createdAt: now, updatedAt: now});
+  await dbUpdate('records', id, {saleId: sid});
+  return 'Hasat ve satış kaydedildi';
+};
+Object.keys(TYPES).forEach(k => { const t = TYPES[k]; FORMS['rec:' + k] = {col: 'records', type: k, title: t.label, eyebrow: GROUPS[t.g], fields: t.fields, calc: t.calc, validate: t.validate, prepare: t.prepare, after: t.after, defaults: {}}; });
 FORMS['rec:sikim'].defaults = {feeType: 'TL'};
 FORMS['rec:satis'].defaults = {status: 'Tahsil edildi', unit: 'kg'};
 FORMS['rec:gider'].defaults = {status: 'Ödendi'};
 FORMS['rec:alim'].defaults = {status: 'Ödendi'};
-FORMS['rec:hasat'].defaults = {purpose: 'Sofralık yeşil'};
+FORMS['rec:hasat'].defaults = {purpose: 'Sofralık yeşil', saleStatus: 'Tahsil edildi'};
 const SETFIELDS = [
   {k: 'farmName', label: 'İşletme adı', t: 'text', ph: 'isteğe bağlı'},
   {k: 'place', label: 'Yer', t: 'text', ph: 'ör. Akhisar, Manisa'},
@@ -1702,7 +1729,7 @@ function derive(){
   });
 
   const PS = {};
-  S.parcels.forEach(p => { PS[p.id] = {cost: 0, kg: 0, last: null, lastH: null, lastSpray: null, safe: null}; });
+  S.parcels.forEach(p => { PS[p.id] = {cost: 0, kg: 0, val: 0, last: null, lastH: null, lastSpray: null, safe: null}; });
   const days = {}, byVar = {}, calTot = {}, byPurpose = {}, calVar = {}, calValVar = {}, calVarAll = {}, calValTot = {};
   let calAll = 0, valTot = 0, valKg = 0, oliveKg = 0, serviceKg = 0;
   const hs = recs.filter(r => r.type === 'hasat');
@@ -1724,6 +1751,7 @@ function derive(){
       });
     }
     spread(r.parcels, kg, 'trees', (id, v) => { PS[id].kg += v; d.pk[id] = (d.pk[id] || 0) + v; if (!PS[id].lastH || r.date > PS[id].lastH) PS[id].lastH = r.date; });
+    if (val) spread(r.parcels, val, 'trees', (id, v) => { PS[id].val += v; });
   });
   recs.forEach(r => {
     const c = costOf(r);
@@ -2068,6 +2096,14 @@ function vYag(){
   if (loading()) return h + loadingBox();
   const sik = D.sik;
   h += sec('Fabrika fişleri', sik.length ? sik.length + ' fiş' : '', sik.length ? '<div class="tw"><table><thead><tr><th>Tarih</th><th>Fabrika</th><th class="n">Zeytin</th><th class="n">Yağ</th><th class="n">Randıman</th><th class="n">Asitlik</th><th class="n">Bekleme</th></tr></thead><tbody>' + sik.map(r => { const y = +r.oliveKg > 0 && +r.oilKg > 0 ? r.oilKg / r.oliveKg * 100 : null, a = acidClass(r.acidity), w = r.harvestDate ? diffDays(r.date, r.harvestDate) : null; return '<tr class="click" data-act="edit" data-form="rec:sikim" data-id="' + esc(r.id) + '"><td>' + fmtDs(r.date) + '</td><td>' + esc(r.mill || '') + '</td><td class="n">' + num(+r.oliveKg || 0) + ' kg</td><td class="n">' + num(+r.oilKg || 0) + ' kg</td><td class="n">' + (y ? '%' + num(y, 1) : '–') + '</td><td class="n">' + (a ? '%' + num(r.acidity, 2) + '<span class="acid ' + a.cls + '">' + esc(a.short) + '</span>' : '–') + '</td><td class="n">' + (w != null ? (w > 2 ? '<span class="tag-low">' + w + ' gün</span>' : w + ' gün') : '–') + '</td></tr>'; }).join('') + '</tbody><tfoot><tr><td colspan="2">Toplam</td><td class="n">' + num(D.sikOlive) + ' kg</td><td class="n">' + num(D.oilGross) + ' kg</td><td class="n">' + (D.yieldPct ? '%' + num(D.yieldPct, 1) : '–') + '</td><td class="n">' + (ok(D.acid) ? '%' + num(D.acid, 2) : '–') + '</td><td></td></tr></tfoot></table></div><p class="note-s">Asitlik sınırları: natürel sızma ≤ %0,8 · natürel birinci ≤ %2,0. Sınıfı yalnız asitlik belirlemez; peroksit ve tadım analizi de gerekir. Bekleme, toplama ile sıkım arasındaki gün sayısıdır.</p>' : emptyBox('Henüz fabrika fişi yok', 'Fişteki zeytin ve yağ kilosunu, asitliği gir; randıman kendiliğinden çıkar.', btnNew('rec:sikim', 'Fiş gir', 'btn-p')));
+  const byP = {};
+  sik.forEach(r => { if (!(r.parcels || []).length || !(+r.oliveKg > 0)) return; const ac = ok(r.acidity) ? +r.acidity : null;
+    spread(r.parcels, +r.oliveKg, 'trees', (id, v) => { const o = byP[id] || (byP[id] = {olive: 0, oil: 0, acW: 0, acKg: 0}); o.olive += v; if (ac != null) { o.acW += ac * v; o.acKg += v; } });
+    spread(r.parcels, +r.oilKg || 0, 'trees', (id, v) => { byP[id].oil += v; }); });
+  const pr = Object.keys(byP).filter(id => PMAP[id]).map(id => Object.assign({p: PMAP[id]}, byP[id])).sort((a, b) => (b.oil / b.olive) - (a.oil / a.olive));
+  if (pr.length) h += sec('Bahçelere göre randıman', 'fişte bahçe seçilenler', '<div class="tw"><table><thead><tr><th>Bahçe</th><th class="n">Zeytin</th><th class="n">Yağ</th><th class="n">Randıman</th><th class="n">Asitlik</th></tr></thead><tbody>' +
+    pr.map(x => '<tr><td>' + esc(x.p.name) + '</td><td class="n">' + num(x.olive) + ' kg</td><td class="n">' + num(x.oil) + ' kg</td><td class="n">%' + num(x.oil / x.olive * 100, 1) + '</td><td class="n">' + (x.acKg ? '%' + num(x.acW / x.acKg, 2) : '–') + '</td></tr>').join('') + '</tbody></table></div>');
+  else if (sik.length) h += '<p class="note-s">Fabrika fişine bahçeyi de seçersen hangi bahçenin daha çok yağ verdiği burada çıkar.</p>';
   const sales = D.recs.filter(r => r.type === 'satis' && PRODUCT_SALES.indexOf(r.cat) >= 0);
   h += sec('Ürün satışları', sales.length ? tl(sum(sales, 'total')) : '', sales.length ? '<div class="tw"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Alıcı</th><th class="n">Miktar</th><th class="n">Birim fiyat</th><th class="n">Tutar</th><th>Durum</th></tr></thead><tbody>' + sales.map(r => '<tr class="click" data-act="edit" data-form="rec:satis" data-id="' + esc(r.id) + '"><td>' + fmtDs(r.date) + '</td><td>' + esc(r.cat) + '</td><td>' + esc(r.buyer || '') + '</td><td class="n">' + esc(qtyTxt(r.qty, r.unit) || '–') + '</td><td class="n">' + (ok(r.price) ? tl(r.price, 2) : '–') + '</td><td class="n">' + tl(+r.total || 0) + '</td><td>' + (r.status === 'Vadeli' ? '<span class="chip tone-out">vadeli</span>' : '<span class="chip tone-in">tahsil</span>') + '</td></tr>').join('') + '</tbody></table></div>' : emptyBox('Henüz satış yok', 'Zeytin ya da yağ satışını gir; elde kalan yağ, kilo fiyatı ve alacaklar hesaplanır.', btnNew('rec:satis', 'Satış gir')));
   return h;
@@ -2125,7 +2161,22 @@ function vBahceler(){
   const head = '<div class="sh first"><h2>Bahçeler</h2><span class="meta">' + [own.length + ' bahçe', area ? num(area, 1) + ' dönüm' : '', trees ? num(trees) + ' ağaç' : ''].filter(Boolean).join(' · ') + '</span><div class="acts">' + btnNew('parcel', '+ Bahçe ekle', 'btn-p') + '</div></div>';
   if (colLoading('parcels')) return head + loadingBox();
   if (!ps.length) return head + emptyBox('Henüz bahçe yok', 'Her parseli ayrı gir: alan, ağaç sayısı, çeşit ve bu sezonun tahmini rekoltesi. Maliyet ve verim bahçe bahçe hesaplanır.', btnNew('parcel', 'İlk bahçeyi ekle', 'btn-p'));
-  return head + '<div class="cards">' + ps.map(parcelCard).join('') + '</div><p class="note-s">Birden çok bahçeye yazılan bir kaydın tutarı alana, hasat kilosu ağaç sayısına göre paylaştırılır; bu bilgiler yoksa eşit bölünür.</p>';
+  return head + profitHTML(own) + '<div class="cards">' + ps.map(parcelCard).join('') + '</div><p class="note-s">Birden çok bahçeye yazılan bir kaydın tutarı alana, hasat kilosu ağaç sayısına göre paylaştırılır; bu bilgiler yoksa eşit bölünür.</p>';
+}
+/* Bahçe başına kâr: hasatların gün fiyatıyla değeri eksi o bahçeye yazılan masraf */
+function profitHTML(own){
+  if (loading()) return '';
+  const rows = own.map(p => { const st = D.PS[p.id] || {}, val = st.val || 0, cost = st.cost || 0, area = +p.area || 0, net = val - cost; return {p: p, val: val, cost: cost, net: net, per: area ? net / area : null}; })
+    .filter(r => r.val > 0.5 || r.cost > 0.5);
+  if (!rows.length) return '';
+  rows.sort((a, b) => (b.per == null ? -1e15 : b.per) - (a.per == null ? -1e15 : a.per) || b.net - a.net);
+  const t = rows.reduce((o, r) => { o.val += r.val; o.cost += r.cost; o.area += +r.p.area || 0; return o; }, {val: 0, cost: 0, area: 0});
+  const td = x => '<td class="n">' + (Math.abs(x) > 0.5 ? esc(tl(x)) : '–') + '</td>';
+  const body = '<div class="tw mx"><table><thead><tr><th>Bahçe</th><th class="n">Ürün değeri</th><th class="n">Masraf</th><th class="n">Net</th><th class="n">Dönüm başı net</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + esc(r.p.name) + '</td>' + td(r.val) + td(r.cost) + '<td class="n' + (r.net < 0 ? ' neg' : '') + '">' + esc(tl(r.net)) + '</td><td class="n">' + (r.per == null ? '–' : esc(tl(r.per))) + '</td></tr>').join('') +
+    '</tbody><tfoot><tr><td>Toplam</td>' + td(t.val) + td(t.cost) + '<td class="n">' + esc(tl(t.val - t.cost)) + '</td><td class="n">' + (t.area ? esc(tl((t.val - t.cost) / t.area)) : '–') + '</td></tr></tfoot></table></div>' +
+    '<p class="note-s">Ürün değeri hasatların gün fiyatlarından gelir. Masraf: o bahçeye yazılan ilaç, gübre, gider, sıkım ücreti ve yevmiye. Bahçe seçmeden girilen genel giderler (ör. ortak mazot) burada yok, Pano’daki toplamda var.</p>';
+  return sec('Bahçe başına kâr', esc(S.season), body);
 }
 function openParcel(id){
   const p = PMAP[id]; if (!p) return;
@@ -2602,8 +2653,9 @@ async function submitForm(more){
   setBusy(true);
   try {
     if (F.prepare) data = await F.prepare(data);
-    await dbSet(F.col, sh.id, data);
-    closeSheet(); toast(sh.doc ? 'Güncellendi' : 'Kaydedildi');
+    const nid = await dbSet(F.col, sh.id, data);
+    const msg = F.after ? await F.after(data, sh.id || nid) : null;
+    closeSheet(); toast(msg || (sh.doc ? 'Güncellendi' : 'Kaydedildi'));
     if (more) openForm('rec:hasat', null, {date: data.date, workers: data.workers, purpose: data.purpose, method: data.method, dest: data.dest, parcels: []});
   } catch (e) { setBusy(false); showErr(writeMsg(e)); }
 }
